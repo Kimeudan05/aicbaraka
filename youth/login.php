@@ -1,211 +1,100 @@
 <?php
-// login.php
-ob_start();
-include '../includes/config.php';
-include '../includes/header.php';
-include 'sidebar.php';
-$errors = [];
+require_once '../includes/config.php';
 
-
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-  // Sanitize inputs
-  $email = ($_POST['email']);
-  $password = $_POST['password'];
-
-  // Validate inputs
-  if (empty($email) || empty($password)) {
-    $errors[] = "Both email and password are required.";
-  }
-
-  if (empty($errors)) {
-    $stmt = $conn->prepare("SELECT id, password, role FROM users WHERE email = ?");
-    $stmt->bind_param("s", $email);
-    $stmt->execute();
-    $stmt->store_result();
-
-    if ($stmt->num_rows == 1) {
-      $stmt->bind_result($id, $hashed_password, $role);
-      $stmt->fetch();
-      if (password_verify($password, $hashed_password)) {
-        // Set session variables
-        if ($role == 'admin') {
-          $_SESSION['admin_id'] = $id;
-          $errors[] = "A youth with such email does not exist.";
-          exit();
-        } else {
-          $_SESSION['user_id'] = $id;
-          header("Location: dashboard.php");
-          exit();
-        }
-      } else {
-        $errors[] = "Incorrect password.";
-      }
-    } else {
-      $errors[] = "No account found with that email.";
-    }
-
-    $stmt->close();
-  }
+if (isset($_SESSION['user_id'])) {
+    header('Location: dashboard.php');
+    exit();
 }
-ob_end_flush();
-?>
 
-<!DOCTYPE html>
-<html lang="en">
+$errors = [];
+$email = '';
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-  <style>
-    body {
-      background-color: green;
-      font-family: Arial, sans-serif;
-      padding: 20px;
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = sanitize_input($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
+
+    if ($email === '' || $password === '') {
+        $errors[] = 'Both email and password are required.';
     }
 
-    .login-container {
-      max-width: 900px;
-      margin: 0 auto;
-      display: flex;
-      flex-wrap: wrap;
-      background: #ffffff;
-      border-radius: 10px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-      overflow: hidden;
-    }
+    if (!$errors) {
+        $stmt = $conn->prepare('SELECT id, password, role FROM users WHERE email = ?');
+        $stmt->bind_param('s', $email);
+        $stmt->execute();
+        $stmt->store_result();
 
-    .left-section,
-    .right-section {
-      padding: 40px;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
+        if ($stmt->num_rows === 1) {
+            $stmt->bind_result($id, $hashedPassword, $role);
+            $stmt->fetch();
 
-    .left-section {
-      background-color: #343a40;
-      color: #ffffff;
-    }
-
-    .left-section h2 {
-      font-size: 2rem;
-      margin-bottom: 20px;
-    }
-
-    .left-section p {
-      font-size: 1rem;
-      line-height: 1.5;
-    }
-
-    .form-control {
-      border-radius: 5px;
-      position: relative;
-    }
-
-    .password-wrapper {
-      position: relative;
-    }
-
-    .hide {
-      position: absolute;
-      right: 15px;
-      top: 50%;
-      /* transform: translateY(-50%); */
-      cursor: pointer;
-    }
-
-    .btn-primary {
-      background-color: #343a40;
-      border-color: #343a40;
-      border-radius: 5px;
-      transition: background-color 0.3s ease;
-    }
-
-    .btn-primary:hover {
-      background-color: #23272b;
-    }
-
-    @media (max-width: 1080px) {
-      .login-container {
-        flex-direction: column;
-        max-width: 70%;
-      }
-
-      body {
-        padding-left: 200px;
-      }
-
-      .left-section,
-      .right-section {
-        padding: 30px;
-      }
-
-      .left-section {
-        text-align: center;
-      }
-    }
-  </style>
-  <title>Login Page</title>
-</head>
-
-<body>
-  <div class="login-container">
-    <div class="left-section">
-      <h2>Welcome Back</h2>
-      <p>Sign in to your account and continue your journey with our community. We are glad to have you back and
-        hope to make your experience meaningful.</p>
-      <p>Don't have an account? <a href="register.php" class="btn btn-primary">Register now</a></p>
-    </div>
-    <div class="right-section">
-      <h3>Login</h3>
-      <?php
-      if (!empty($errors)) {
-        echo '<div class="alert alert-danger"><ul>';
-        foreach ($errors as $error) {
-          echo '<li>' . htmlspecialchars($error) . '</li>';
+            if ($role === 'admin') {
+                $errors[] = 'A youth account with this email does not exist.';
+            } elseif (password_verify($password, $hashedPassword)) {
+                $_SESSION['user_id'] = $id;
+                header('Location: dashboard.php');
+                exit();
+            } else {
+                $errors[] = 'Incorrect password.';
+            }
+        } else {
+            $errors[] = 'No account found with that email.';
         }
-        echo '</ul></div>';
-      }
-      ?>
-      <form action="login.php" method="POST">
-        <div class="form-group">
-          <label for="email">Email*</label>
-          <input type="email" class="form-control" id="email" name="email" required placeholder="abc@mail.com"
-            value="<?php echo isset($email) ? htmlspecialchars($email) : ''; ?>">
+
+        $stmt->close();
+    }
+}
+
+$pageTitle = 'Youth Login';
+include '../includes/header.php';
+?>
+<main class="app-main container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow-sm overflow-hidden">
+                <div class="row g-0">
+                    <div class="col-md-5 bg-dark text-white p-4 d-flex flex-column justify-content-center">
+                        <h2 class="h3 mb-3">Welcome back</h2>
+                        <p class="mb-4">Sign in to stay connected with the community and access the latest resources and events.</p>
+                        <p class="mb-0">Don&apos;t have an account yet?</p>
+                        <a class="btn btn-outline-light mt-3" href="register.php">Register now</a>
+                    </div>
+                    <div class="col-md-7 p-4">
+                        <h1 class="h4 mb-3">Youth Login</h1>
+                        <?php if ($errors): ?>
+                            <div class="alert alert-danger">
+                                <ul class="mb-0">
+                                    <?php foreach ($errors as $error): ?>
+                                        <li><?= htmlspecialchars($error); ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
+                        <?php endif; ?>
+                        <form method="post" novalidate>
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email address</label>
+                                <input type="email" class="form-control" id="email" name="email" value="<?= htmlspecialchars($email); ?>" required autocomplete="username">
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Password</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="password" name="password" required autocomplete="current-password">
+                                    <button class="btn btn-outline-secondary password-toggle" type="button" data-password-toggle="password">
+                                        <i class="fa fa-eye"></i>
+                                        <span class="visually-hidden">Toggle password visibility</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <a href="forgot_password.php">Forgot password?</a>
+                            </div>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">Sign in</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="form-group password-wrapper">
-          <label for="password">Password*</label>
-          <input type="password" class="form-control" id="password" name="password" required
-            placeholder="Enter password">
-          <span class="hide"><i class="fa fa-eye" aria-hidden="true"></i></span>
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">Login</button>
-        <p><a href="forgot_password.php">Forgot Password?</a></p>
-      </form>
     </div>
-  </div>
-
-  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
-  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-  <script>
-    document.querySelector('.hide').addEventListener('click', function() {
-      const passwordField = document.getElementById('password');
-      const icon = this.querySelector('i');
-      if (passwordField.type === 'password') {
-        passwordField.type = 'text';
-        icon.classList.remove('fa-eye');
-        icon.classList.add('fa-eye-slash');
-      } else {
-        passwordField.type = 'password';
-        icon.classList.remove('fa-eye-slash');
-        icon.classList.add('fa-eye');
-      }
-    });
-  </script>
-</body>
-
-</html>
+</main>
+<?php include '../includes/footer.php'; ?>

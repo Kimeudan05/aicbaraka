@@ -1,80 +1,32 @@
-<!-- includes/youth_sidebar.php -->
 <?php
-// Check if admin_id is set in the session
-if (isset($_SESSION['admin_id'])) {
-  $user_id = $_SESSION['admin_id'];
+$adminDisplayName = 'Guest';
 
-  // Prepare and execute the statement to fetch admin details
-  $stmt = $conn->prepare("SELECT firstname, lastname FROM users WHERE id = ?");
-  $stmt->bind_param("i", $user_id);
-  $stmt->execute();
-  $stmt->bind_result($first_name, $last_name);
-  $stmt->fetch();
-  $stmt->close();
-} else {
-  // Set default values if admin_id is not set
-  $first_name = "Guest";
-  $last_name = "";
+if (isset($_SESSION['admin_id'])) {
+    $adminId = $_SESSION['admin_id'];
+    $stmt = $conn->prepare('SELECT firstname, lastname FROM users WHERE id = ?');
+    $stmt->bind_param('i', $adminId);
+    $stmt->execute();
+    $stmt->bind_result($firstName, $lastName);
+    if ($stmt->fetch()) {
+        $adminDisplayName = trim($firstName . ' ' . $lastName);
+    }
+    $stmt->close();
 }
 ?>
-
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Sidebar</title>
-  <style>
-    p a {
-      list-style-type: none;
-      font-size: 1.3rem;
-    }
-
-    p.btn::after {
-      content: "---------------------";
-      height: 2px;
-      width: 0;
-      /* background: transparent; */
-      transition: width .5s ease, background-color .5s ease;
-    }
-
-    p.btn:hover {
-      background-color: #343a40;
-      color: #ffffff;
-
-    }
-  </style>
-</head>
-
-<body>
-  <div class="container">
-    <aside class="bg-dark-subtle position-fixed text-dark me-5"
-      style="top: 80px; bottom: 0; left: 0; width: 250px; overflow-y: auto; ">
-      <div class="sidebar-sticky p-0">
-        <h5 class="text-dark mt-3 text-center">Welcome,
-          <?php echo htmlspecialchars($first_name . ' ' . $last_name); ?>
-        </h5>
-        <h5 class="text-center">Admin Navigation</h5>
-        <div class="list-unstyled mb-4 p-3 text-center navigator">
-          <p class="btn"><a href="add_youth.php" class="list-group-item list-group-item-action">Add Youth</a>
-          </p>
-          <p class="btn"><a href="manage_youth.php" class="list-group-item list-group-item-action">Manage Youths</a>
-
-          <p class="btn"><a href="manage_pledges.php" class="list-group-item list-group-item-action">
-              Manage pledges</a></p>
-          </p>
-          <p class="btn"><a href="upload_resources.php" class="list-group-item list-group-item-action">Upload
-              Resources</a></p>
-          <p class="btn"><a href="resources.php" class="list-group-item list-group-item-action">Manage resources</a></p>
-          <p class="btn"><a href="moderate_encouragement.php" class="list-group-item list-group-item-action">Moderate
-              Encouragements</a></p>
-          <p class="btn"><a href="view_encouragements.php" class="list-group-item list-group-item-action">View
-              Approved Encouragements</a></p>
-        </div>
-      </div>
-    </aside>
-  </div>
-</body>
-
-</html>
+<aside id="appSidebar" class="app-sidebar bg-light">
+    <div class="text-center mb-4">
+        <p class="fw-semibold mb-1">Welcome, <?= htmlspecialchars($adminDisplayName); ?></p>
+        <p class="text-muted small mb-0">Admin Navigation</p>
+    </div>
+    <nav class="nav flex-column gap-2">
+        <a class="nav-link" href="dashboard.php"><i class="fas fa-gauge me-2"></i>Dashboard</a>
+        <a class="nav-link" href="add_youth.php"><i class="fas fa-user-plus me-2"></i>Add Youth</a>
+        <a class="nav-link" href="manage_youth.php"><i class="fas fa-users me-2"></i>Manage Youth</a>
+        <a class="nav-link" href="manage_pledges.php"><i class="fas fa-hand-holding-heart me-2"></i>Manage Pledges</a>
+        <a class="nav-link" href="upload_resources.php"><i class="fas fa-cloud-upload-alt me-2"></i>Upload Resources</a>
+        <a class="nav-link" href="resources.php"><i class="fas fa-folder-open me-2"></i>Resource Library</a>
+        <a class="nav-link" href="moderate_encouragement.php"><i class="fas fa-comments me-2"></i>Moderate Encouragements</a>
+        <a class="nav-link" href="view_encouragements.php"><i class="fas fa-eye me-2"></i>Approved Encouragements</a>
+        <a class="nav-link" href="profile.php"><i class="fas fa-id-badge me-2"></i>My Profile</a>
+    </nav>
+</aside>

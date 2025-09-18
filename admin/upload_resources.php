@@ -1,133 +1,116 @@
 <?php
-// admin/upload_resources.php
-
 require_once '../includes/config.php';
 
-// Check if admin is logged in
 if (!isset($_SESSION['admin_id'])) {
-  header("Location: login.php");
-  exit();
+    header('Location: login.php');
+    exit();
 }
 
 $errors = [];
-$success = "";
+$success = '';
+$title = $type = $description = '';
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-  // Sanitize inputs
-  $title = sanitize_input($_POST['title']);
-  $type = sanitize_input($_POST['type']);
-  $description = sanitize_input($_POST['description']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $title = sanitize_input($_POST['title'] ?? '');
+    $type = sanitize_input($_POST['type'] ?? '');
+    $description = sanitize_input($_POST['description'] ?? '');
 
-  // Validate inputs
-  if (empty($title) || empty($type)) {
-    $errors[] = "Title and type are required.";
-  }
-
-  // Handle file upload
-  if (isset($_FILES['resource_file']) && $_FILES['resource_file']['error'] == 0) {
-    // Define allowed file types based on resource type
-    $allowed = [];
-    if ($type == 'Bible Verse' || $type == 'Announcement') {
-      $allowed = ['pdf', 'docx', 'txt'];
-    } elseif ($type == 'Picture') {
-      $allowed = ['jpg', 'jpeg', 'png', 'gif'];
+    if ($title === '' || $type === '') {
+        $errors[] = 'Title and resource type are required.';
     }
 
-    $filename = $_FILES['resource_file']['name'];
-    $file_tmp = $_FILES['resource_file']['tmp_name'];
-    $file_ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+    $filePath = null;
+    if (!$errors && isset($_FILES['resource_file']) && $_FILES['resource_file']['error'] === UPLOAD_ERR_OK) {
+        $filename = $_FILES['resource_file']['name'];
+        $fileTmp = $_FILES['resource_file']['tmp_name'];
+        $fileExt = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
 
-    if (in_array($file_ext, $allowed)) {
-      $new_filename = uniqid() . "." . $file_ext;
-      $upload_dir = "../assets/resources/";
-      if (!is_dir($upload_dir)) {
-        mkdir($upload_dir, 0755, true);
-      }
-      move_uploaded_file($file_tmp, $upload_dir . $new_filename);
-      $file_path = $upload_dir . $new_filename;
+        $allowed = [];
+        if (in_array($type, ['Bible Verse', 'Announcement'], true)) {
+            $allowed = ['pdf', 'doc', 'docx', 'txt'];
+        } elseif ($type === 'Picture') {
+            $allowed = ['jpg', 'jpeg', 'png', 'gif'];
+        }
+
+        if (!in_array($fileExt, $allowed, true)) {
+            $errors[] = 'The selected file type is not allowed for this resource.';
+        } else {
+            $newFilename = uniqid('resource_', true) . '.' . $fileExt;
+            $storageDirectory = dirname(__DIR__) . '/assets/resources/';
+            if (!is_dir($storageDirectory)) {
+                mkdir($storageDirectory, 0755, true);
+            }
+            if (!move_uploaded_file($fileTmp, $storageDirectory . $newFilename)) {
+                $errors[] = 'Failed to store the uploaded file. Please try again.';
+            } else {
+                $filePath = 'assets/resources/' . $newFilename;
+            }
+        }
     } else {
-      $errors[] = "Invalid file type for the selected resource type.";
-    }
-  } else {
-    $errors[] = "Resource file is required.";
-  }
-
-  // If no errors, insert into database
-  if (empty($errors)) {
-    $stmt = $conn->prepare("INSERT INTO resources (title, type, description, file_path) VALUES (?, ?, ?,?)");
-    $stmt->bind_param("ssss", $title, $type, $description, $file_path);
-
-    if ($stmt->execute()) {
-      $success = "Resource uploaded successfully.";
-    } else {
-      $errors[] = "Failed to upload resource.";
+        $errors[] = 'Resource file is required.';
     }
 
-    $stmt->close();
-  }
-  header("Location:resources.php");
+    if (!$errors && $filePath) {
+        $stmt = $conn->prepare('INSERT INTO resources (title, type, description, file_path, uploaded_by) VALUES (?, ?, ?, ?, ?)');
+        $uploadedBy = $_SESSION['admin_id'];
+        $stmt->bind_param('ssssi', $title, $type, $description, $filePath, $uploadedBy);
+
+        if ($stmt->execute()) {
+            $_SESSION['success_message'] = 'Resource uploaded successfully.';
+            header('Location: resources.php');
+            exit();
+        }
+
+        $errors[] = 'Failed to record the resource in the database.';
+        $stmt->close();
+    }
 }
+
+$pageTitle = 'Upload Resource';
+$bodyClass = 'has-sidebar';
+$showSidebarToggle = true;
+include '../includes/header.php';
+include 'admin_sidebar.php';
 ?>
+<main class="app-main container py-4">
+    <h1 class="h4 mb-4 text-center">Upload Resource</h1>
 
-<?php include '../includes/header.php'; ?>
-<?php include "admin_sidebar.php" ?>
+    <?php if ($errors): ?>
+        <div class="alert alert-danger">
+            <ul class="mb-0">
+                <?php foreach ($errors as $error): ?>
+                    <li><?= htmlspecialchars($error); ?></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+    <?php endif; ?>
 
-<h2 class="text-center">Upload Resources</h2>
-
-<?php
-if (!empty($errors)) {
-  echo '<div class="alert alert-danger"><ul>';
-  foreach ($errors as $error) {
-    echo '<li>' . $error . '</li>';
-  }
-  echo '</ul></div>';
-}
-
-if ($success) {
-  echo '<div class="alert alert-success">' . $success . '</div>';
-}
-?>
-
-<form action="upload_resources.php" method="POST" enctype="multipart/form-data" class="form-container bg-body-secondary p-3 mx-auto w-50 mb-3">
-  <div class="mb-3">
-    <label for="title" class="form-label">Resource Title*</label>
-    <input type="text" class="form-control" id="title" name="title" placeholder="Enter resource title" required
-      value="<?php echo isset($title) ? htmlspecialchars($title) : ''; ?>">
-  </div>
-  <div class="mb-3">
-    <label for="type" class="form-label">Resource Type*</label>
-    <select class="form-select" id="type" name="type" required>
-      <option value="">Select Type</option>
-      <option value="Bible Verse" <?php if (isset($type) && $type == 'Bible Verse')
-                                    echo 'selected'; ?>>Bible Verse
-      </option>
-      <option value="Picture" <?php if (isset($type) && $type == 'Picture')
-                                echo 'selected'; ?>>Picture</option>
-      <option value="Announcement" <?php if (isset($type) && $type == 'Announcement')
-                                      echo 'selected'; ?>>Announcement
-      </option>
-    </select>
-  </div>
-  <div class="mb-3">
-    <textarea name="description" id="description" class="form-control"
-      placeholder="Enter resource description"></textarea>
-  </div>
-
-  <div class="mb-3">
-    <label for="resource_file" class="form-label">Resource File*</label>
-    <input type="file" class="form-control" id="resource_file" name="resource_file" required accept="<?php
-                                                                                                      if (isset($type)) {
-                                                                                                        if ($type == 'Bible Verse' || $type == 'Announcement') {
-                                                                                                          echo '.pdf,.docx,.txt';
-                                                                                                        } elseif ($type == 'Picture') {
-                                                                                                          echo 'image/*';
-                                                                                                        }
-                                                                                                      } else {
-                                                                                                        echo '*/*';
-                                                                                                      }
-                                                                                                      ?>">
-  </div>
-  <button type="submit" class="btn btn-primary ">Upload Resource</button>
-</form>
-
+    <form method="post" enctype="multipart/form-data" class="form-container bg-white rounded shadow-sm p-4">
+        <div class="mb-3">
+            <label for="title" class="form-label">Resource title</label>
+            <input type="text" class="form-control" id="title" name="title" value="<?= htmlspecialchars($title); ?>" required>
+        </div>
+        <div class="mb-3">
+            <label for="type" class="form-label">Resource type</label>
+            <select class="form-select" id="type" name="type" required>
+                <option value="" <?= $type === '' ? 'selected' : ''; ?>>Select type</option>
+                <option value="Bible Verse" <?= $type === 'Bible Verse' ? 'selected' : ''; ?>>Bible Verse</option>
+                <option value="Picture" <?= $type === 'Picture' ? 'selected' : ''; ?>>Picture</option>
+                <option value="Announcement" <?= $type === 'Announcement' ? 'selected' : ''; ?>>Announcement</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="description" class="form-label">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="3" placeholder="Add a short description (optional)"><?= htmlspecialchars($description); ?></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="resource_file" class="form-label">Resource file</label>
+            <input type="file" class="form-control" id="resource_file" name="resource_file" required>
+            <div class="form-text">Allowed formats depend on the resource type selected above.</div>
+        </div>
+        <div class="d-grid">
+            <button type="submit" class="btn btn-primary">Upload</button>
+        </div>
+    </form>
+</main>
 <?php include '../includes/footer.php'; ?>

@@ -1,67 +1,28 @@
-<!-- includes/user_sidebar.php -->
 <?php
-// include '../includes/config.php';
-// Check if user_id is set in the session
-if (isset($_SESSION['user_id'])) {
-  $user_id = $_SESSION['user_id'];
+$youthDisplayName = 'Guest';
 
-  // Prepare and execute the statement to fetch user details
-  $stmt = $conn->prepare("SELECT firstname, lastname FROM users WHERE id = ?");
-  $stmt->bind_param("i", $user_id);
-  $stmt->execute();
-  $stmt->bind_result($first_name, $last_name);
-  $stmt->fetch();
-  $stmt->close();
-} else {
-  // Set default values if user_id is not set
-  $first_name = "Guest";
-  $last_name = "";
+if (isset($_SESSION['user_id'])) {
+    $youthId = $_SESSION['user_id'];
+    $stmt = $conn->prepare('SELECT firstname, lastname FROM users WHERE id = ?');
+    $stmt->bind_param('i', $youthId);
+    $stmt->execute();
+    $stmt->bind_result($firstName, $lastName);
+    if ($stmt->fetch()) {
+        $youthDisplayName = trim($firstName . ' ' . $lastName);
+    }
+    $stmt->close();
 }
 ?>
-
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>User Sidebar</title>
-  <style>
-    p a {
-      list-style-type: none;
-    }
-
-    p.btn::after {
-      content: "-----------------------";
-      height: 1px;
-      margin-top: 5px;
-      margin-bottom: 5px;
-    }
-  </style>
-</head>
-
-<body>
-  <div class="container">
-    <aside class="bg-dark-subtle position-fixed text-white"
-      style="top: 80px; bottom: 0; left: 0; width: 250px; overflow-y: auto;">
-      <div class="sidebar-sticky p-0">
-        <h5 class="text-dark mt-5 text-cente text-capitalize">Welcome,
-          <?php echo htmlspecialchars($first_name . ' ' . $last_name); ?>
-        </h5>
-        <h5 class="text-center">Navigation</h5>
-        <div class="list-unstyled mb-4 p-3 text-center">
-          <p class="btn"><a class="list-group-item list-group-item-action" href="resources.php">View Resources</a></p>
-
-          <p class="btn "><a class="list-group-item list-group-item-action" href="encouragement.php">Share
-              Encouragements</a></p>
-
-          <p class="btn "><a class="list-group-item list-group-item-action" href="pledge.php">Share
-              Pledge a giving</a></p>
-
-        </div>
-      </div>
-    </aside>
-  </div>
-</body>
-
-</html>
+<aside id="appSidebar" class="app-sidebar bg-light">
+    <div class="text-center mb-4">
+        <p class="fw-semibold mb-1">Welcome, <?= htmlspecialchars($youthDisplayName); ?></p>
+        <p class="text-muted small mb-0">Quick Actions</p>
+    </div>
+    <nav class="nav flex-column gap-2">
+        <a class="nav-link" href="dashboard.php"><i class="fas fa-gauge me-2"></i>Dashboard</a>
+        <a class="nav-link" href="resources.php"><i class="fas fa-book-open me-2"></i>View Resources</a>
+        <a class="nav-link" href="encouragement.php"><i class="fas fa-heart me-2"></i>Share Encouragement</a>
+        <a class="nav-link" href="pledge.php"><i class="fas fa-hand-holding-usd me-2"></i>Make a Pledge</a>
+        <a class="nav-link" href="profile.php"><i class="fas fa-id-card me-2"></i>My Profile</a>
+    </nav>
+</aside>
