@@ -1,170 +1,163 @@
 <?php
-// admin/manage_youth.php
-
 require_once '../includes/config.php';
 
-// Check if admin is logged in
 if (!isset($_SESSION['admin_id'])) {
-  header("Location: login.php");
-  exit();
+    header('Location: login.php');
+    exit();
 }
 
-// Handle delete operation
 if (isset($_GET['delete_id'])) {
-  $delete_id = intval($_GET['delete_id']);
-  // Fetch profile picture path to delete the file
-  $stmt = $conn->prepare("SELECT profile_picture FROM users WHERE id = ?");
-  $stmt->bind_param("i", $delete_id);
-  $stmt->execute();
-  $stmt->bind_result($profile_picture);
-  $stmt->fetch();
-  $stmt->close();
+    $deleteId = (int) $_GET['delete_id'];
 
-  // Delete user from database
-  $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
-  $stmt->bind_param("i", $delete_id);
-  if ($stmt->execute()) {
-    // Delete profile picture file if exists
-    if ($profile_picture && file_exists("../" . $profile_picture)) {
-      unlink("../" . $profile_picture);
+    $stmt = $conn->prepare('SELECT profile_picture FROM users WHERE id = ?');
+    $stmt->bind_param('i', $deleteId);
+    $stmt->execute();
+    $stmt->bind_result($profilePicture);
+    $stmt->fetch();
+    $stmt->close();
+
+    $stmt = $conn->prepare('DELETE FROM users WHERE id = ?');
+    $stmt->bind_param('i', $deleteId);
+    if ($stmt->execute()) {
+        if ($profilePicture) {
+            $profilePath = dirname(__DIR__) . '/' . ltrim($profilePicture, '/');
+            if (file_exists($profilePath)) {
+                unlink($profilePath);
+            }
+        }
+        $message = 'Youth deleted successfully.';
+    } else {
+        $message = 'Failed to delete youth.';
     }
-    $message = "Youth deleted successfully.";
-  } else {
-    $message = "Failed to delete youth.";
-  }
-  $stmt->close();
+    $stmt->close();
 }
 
-// Fetch all youths
 $youths = [];
-$stmt = $conn->prepare("SELECT id, firstname, lastname, email, phone, profile_picture FROM users WHERE role = 'youth'");
+$stmt = $conn->prepare("SELECT id, firstname, lastname, email, phone, profile_picture FROM users WHERE role = 'youth' ORDER BY lastname, firstname");
 $stmt->execute();
 $result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) {
-  $youths[] = $row;
+    $youths[] = $row;
 }
 $stmt->close();
+
+$pageTitle = 'Manage Youth';
+$bodyClass = 'has-sidebar';
+$showSidebarToggle = true;
+$extraScripts = [
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'
+];
+include '../includes/header.php';
+include 'admin_sidebar.php';
 ?>
-
-<?php include '../includes/header.php'; ?>
-<?php include "admin_sidebar.php"; ?>
-
-<div class="container mt-4">
-  <div class=" mb-4 table-container">
-    <div class="d-flex align-items-center bg-danger-subtle w-100 justify-content-between">
-      <img src="../assets/images/logo.png" alt="Church Logo" style="height: 100px;width: 100px; margin-right: 10px;">
-      <h3 class="mb-0">AIC BARAKA HUNTERS</h3>
-      <div id="currentDateTime" class="font-weight-bold"></div>
+<main class="app-main container py-4">
+    <div class="d-flex align-items-center justify-content-between bg-light border rounded p-3 mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <img src="<?= htmlspecialchars($assetBase); ?>assets/images/logo.png" alt="Church Logo" width="72" height="72" class="rounded-circle">
+            <div>
+                <h1 class="h4 mb-0">Registered Youths</h1>
+                <small id="currentDateTime" class="text-muted"></small>
+            </div>
+        </div>
+        <div class="text-end">
+            <button class="btn btn-outline-primary me-2" type="button" onclick="printTable()"><i class="fas fa-print me-1"></i>Print</button>
+            <button class="btn btn-primary" type="button" onclick="downloadPDF()"><i class="fas fa-file-pdf me-1"></i>Download PDF</button>
+        </div>
     </div>
-
-    <!-- the table -->
-    <h2 class="text-center">Youths Available on our site</h2>
 
     <?php if (isset($message)): ?>
-      <div class="alert alert-info">
-        <?php echo htmlspecialchars($message); ?>
-      </div>
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <?= htmlspecialchars($message); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
     <?php endif; ?>
 
-    <div class="">
-      <table class="table table-bordered table-striped">
-        <thead class="thead-dark">
-          <tr>
-            <th>ID</th>
-            <th>Profile Picture</th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Phone</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php if (count($youths) > 0): ?>
-            <?php foreach ($youths as $youth): ?>
-              <tr>
-                <td>
-                  <?php echo htmlspecialchars($youth['id']); ?>
-                </td>
-                <td>
-                  <?php if ($youth['profile_picture']): ?>
-                    <img src="<?php echo htmlspecialchars('../youth/' . $youth['profile_picture']); ?>" alt="Profile
-                Picture" width="100" height="50">
-                  <?php else: ?>
-                    <img src="../assets/images/boy.png" alt="Default Profile" width="50" height="50">
-                  <?php endif; ?>
-                </td>
-                <td>
-                  <?php echo htmlspecialchars($youth['firstname'] . " " . $youth['lastname']); ?>
-                </td>
-                <td><?php echo htmlspecialchars($youth['email']); ?></td>
-                <td>
-                  <?php echo htmlspecialchars($youth['phone']); ?>
-                </td>
-                <td>
-                  <a href="manage_youth.php?delete_id=<?php echo $youth['id']; ?>" class="btn btn-sm btn-danger" onclick="return
-                confirm('Are you sure you want to delete this youth?');">Delete</a>
-                </td>
-              </tr>
-            <?php endforeach; ?>
-          <?php else: ?>
-            <tr>
-              <td colspan="6" class="text-center">No youths found.</td>
-            </tr>
-          <?php endif; ?>
-        </tbody>
-      </table>
+    <div class="table-responsive table-container">
+        <table class="table table-striped table-bordered align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th scope="col">ID</th>
+                    <th scope="col">Profile</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Email</th>
+                    <th scope="col">Phone</th>
+                    <th scope="col" class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if ($youths): ?>
+                    <?php foreach ($youths as $youth): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($youth['id']); ?></td>
+                            <td>
+                                <?php if (!empty($youth['profile_picture'])): ?>
+                                    <img src="<?= htmlspecialchars($assetBase . $youth['profile_picture']); ?>" alt="Profile picture" class="rounded" width="72" height="72">
+                                <?php else: ?>
+                                    <img src="<?= htmlspecialchars($assetBase); ?>assets/images/boy.png" alt="Default profile" class="rounded" width="72" height="72">
+                                <?php endif; ?>
+                            </td>
+                            <td><?= htmlspecialchars($youth['firstname'] . ' ' . $youth['lastname']); ?></td>
+                            <td><?= htmlspecialchars($youth['email']); ?></td>
+                            <td><?= htmlspecialchars($youth['phone']); ?></td>
+                            <td class="text-center">
+                                <a href="manage_youth.php?delete_id=<?= $youth['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this youth?');">
+                                    <i class="fas fa-trash-alt"></i> Delete
+                                </a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="6" class="text-center">No youth records found.</td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
-  </div>
-
-
-
-  <button class="btn btn-primary" onclick="printTable()">Print Table</button>
-  <button class="btn btn-secondary" onclick="downloadPDF()">Download as PDF</button>
-</div>
-
+</main>
 <script>
-  // Display current date and time
-  function updateDateTime() {
-    const dateTimeElement = document.getElementById('currentDateTime');
-    const now = new Date();
-    dateTimeElement.textContent = now.toLocaleString();
-  }
-  updateDateTime();
+    document.addEventListener('DOMContentLoaded', () => {
+        const dateTimeElement = document.getElementById('currentDateTime');
+        if (dateTimeElement) {
+            const now = new Date();
+            dateTimeElement.textContent = now.toLocaleString();
+        }
+    });
 
-  // Function to print only the table
-  function printTable() {
-    var tableContent = document.querySelector(".table-container").innerHTML;
-    var printWindow = window.open("", "_blank");
-    printWindow.document.write("<html><head><title>Print Table</title>");
-    printWindow.document.write("<link rel='stylesheet' href='https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css'>");
-    printWindow.document.write("</head><body>");
-    printWindow.document.write(tableContent);
-    printWindow.document.write("</body></html>");
-    printWindow.document.close();
-    printWindow.print();
-  }
+    function printTable() {
+        const tableContent = document.querySelector('.table-container').innerHTML;
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            return;
+        }
+        printWindow.document.write('<html><head><title>Youth Records</title>');
+        printWindow.document.write('<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">');
+        printWindow.document.write('</head><body>');
+        printWindow.document.write(tableContent);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.print();
+    }
 
-  // Function to download the table as a PDF with profile pictures
-  async function downloadPDF() {
-    const {
-      jsPDF
-    } = window.jspdf;
-    const doc = new jsPDF();
-    const table = document.querySelector(".table-container");
+    async function downloadPDF() {
+        const { jsPDF } = window.jspdf;
+        const table = document.querySelector('.table-container');
+        if (!jsPDF || !table) {
+            return;
+        }
 
-    // Use html2canvas to capture the table as an image
-    const canvas = await html2canvas(table);
-    const imgData = canvas.toDataURL("image/png");
+        const canvas = await html2canvas(table);
+        const imageData = canvas.toDataURL('image/png');
 
-    doc.text("Manage Youths", 14, 10);
-    doc.addImage(imgData, 'PNG', 10, 20, 190, 0); // Adjust dimensions as needed
-    doc.save('manage_youths.pdf');
-  }
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const imageHeight = (canvas.height * pageWidth) / canvas.width;
+
+        pdf.text('Youth Ministry Roster', 14, 16);
+        pdf.addImage(imageData, 'PNG', 10, 24, pageWidth - 20, imageHeight);
+        pdf.save('youth_roster.pdf');
+    }
 </script>
-
-<!-- Include jsPDF, jsPDF-AutoTable, and html2canvas libraries -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.13/jspdf.plugin.autotable.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
 <?php include '../includes/footer.php'; ?>

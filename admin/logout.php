@@ -1,11 +1,10 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Destroy the session to log out the admin
-session_unset();
+$_SESSION = [];
 session_destroy();
 
-// Redirect to the login page
-header("Location: login.php");
+header('Location: login.php');
 exit();
-?>

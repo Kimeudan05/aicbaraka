@@ -1,135 +1,148 @@
 <?php
-// profile.php
-
 require_once '../includes/config.php';
 
-// Check if user is logged in
-if (!isset($_SESSION['user_id']))
-{
-  header("Location: login.php");
-  exit();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
 }
 
-$user_id = $_SESSION['user_id'];
-$errors = [];
-$success = "";
+$youthId = $_SESSION['user_id'];
 
-// Fetch user details
-$stmt = $conn->prepare("SELECT firstname, lastname, email, phone, profile_picture FROM users WHERE id = ?");
-$stmt->bind_param("i", $user_id);
+$stmt = $conn->prepare('SELECT firstname, lastname, email, phone, profile_picture FROM users WHERE id = ?');
+$stmt->bind_param('i', $youthId);
 $stmt->execute();
-$stmt->bind_result($firstname, $lastname, $email, $phone, $profile_picture);
+$stmt->bind_result($firstName, $lastName, $email, $phone, $profilePicture);
 $stmt->fetch();
 $stmt->close();
 
-if ($_SERVER["REQUEST_METHOD"] == "POST")
-{
-  // Sanitize inputs
-  $phone = sanitize_input($_POST['phone']);
+$errors = [];
+$success = '';
 
-  // Handle profile picture upload
-  if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] == 0)
-  {
-    $allowed = ['jpg', 'jpeg', 'png', 'gif'];
-    $filename = $_FILES['profile_picture']['name'];
-    $file_tmp = $_FILES['profile_picture']['tmp_name'];
-    $file_ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $phone = sanitize_input($_POST['phone'] ?? '');
 
-    if (in_array($file_ext, $allowed))
-    {
-      $new_filename = uniqid() . "." . $file_ext;
-      $upload_dir = "assets/images/profiles/";
-      if (!is_dir($upload_dir))
-      {
-        mkdir($upload_dir, 0755, true);
-      }
-      move_uploaded_file($file_tmp, $upload_dir . $new_filename);
-      // Delete old profile picture if exists
-      if ($profile_picture && file_exists($profile_picture))
-      {
-        unlink($profile_picture);
-      }
-      $profile_picture = $upload_dir . $new_filename;
-    } else
-    {
-      $errors[] = "Invalid file type for profile picture.";
-    }
-  }
-
-  if (empty($errors))
-  {
-    $stmt = $conn->prepare("UPDATE users SET phone = ?, profile_picture = ? WHERE id = ?");
-    $stmt->bind_param("ssi", $phone, $profile_picture, $user_id);
-
-    if ($stmt->execute())
-    {
-      $success = "Profile updated successfully.";
-    } else
-    {
-      $errors[] = "Failed to update profile.";
+    if ($phone === '') {
+        $errors[] = 'Phone number is required.';
     }
 
-    $stmt->close();
-  }
+    $uploadedPath = $profilePicture;
+    if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] === UPLOAD_ERR_OK) {
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+        $originalName = $_FILES['profile_picture']['name'];
+        $tmpPath = $_FILES['profile_picture']['tmp_name'];
+        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+
+        if (!in_array($extension, $allowedExtensions, true)) {
+            $errors[] = 'Invalid file type. Please upload an image (JPG, PNG, or GIF).';
+        } else {
+            $newFilename = uniqid('profile_', true) . '.' . $extension;
+            $uploadDirectory = dirname(__DIR__) . '/assets/images/profiles/';
+            if (!is_dir($uploadDirectory)) {
+                mkdir($uploadDirectory, 0755, true);
+            }
+
+            if (move_uploaded_file($tmpPath, $uploadDirectory . $newFilename)) {
+                if ($profilePicture) {
+                    $existingPath = dirname(__DIR__) . '/' . $profilePicture;
+                    if (is_file($existingPath)) {
+                        unlink($existingPath);
+                    }
+                }
+                $uploadedPath = 'assets/images/profiles/' . $newFilename;
+            } else {
+                $errors[] = 'Failed to upload the new profile picture. Please try again.';
+            }
+        }
+    }
+
+    if (!$errors) {
+        $stmt = $conn->prepare('UPDATE users SET phone = ?, profile_picture = ? WHERE id = ?');
+        $stmt->bind_param('ssi', $phone, $uploadedPath, $youthId);
+        if ($stmt->execute()) {
+            $success = 'Profile updated successfully.';
+            $profilePicture = $uploadedPath;
+        } else {
+            $errors[] = 'Failed to update profile details.';
+        }
+        $stmt->close();
+    }
 }
+
+$pageTitle = 'My Profile';
+$bodyClass = 'has-sidebar';
+$showSidebarToggle = true;
+include '../includes/header.php';
+include 'sidebar.php';
 ?>
+<main class="app-main container py-4">
+    <h1 class="h4 mb-3">My profile</h1>
+    <p class="text-muted mb-4">Keep your contact information up to date so we can reach you about upcoming events.</p>
 
-<?php include '../includes/header.php'; ?>
-<?php include 'sidebar.php' ?>
-
-<h2>My Profile</h2>
-
-<?php
-if (!empty($errors))
-{
-  echo '<div class="alert alert-danger"><ul>';
-  foreach ($errors as $error)
-  {
-    echo '<li>' . $error . '</li>';
-  }
-  echo '</ul></div>';
-}
-
-if ($success)
-{
-  echo '<div class="alert alert-success">' . $success . '</div>';
-}
-?>
-
-<div class="row">
-  <div class="col-md-4">
-    <?php if ($profile_picture): ?>
-      <img src="<?php echo htmlspecialchars($profile_picture); ?>" alt="Profile Picture" class="img-fluid rounded">
-    <?php else: ?>
-      <img src="../assets/images/default_profile.png" alt="Default Profile Picture" class="img-fluid rounded">
+    <?php if ($errors): ?>
+        <div class="alert alert-danger">
+            <ul class="mb-0">
+                <?php foreach ($errors as $error): ?>
+                    <li><?= htmlspecialchars($error); ?></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
     <?php endif; ?>
-  </div>
-  <div class="col-md-8">
-    <form action="profile.php" method="POST" enctype="multipart/form-data">
-      <div class="mb-3">
-        <label class="form-label">First Name</label>
-        <input type="text" class="form-control" value="<?php echo htmlspecialchars($firstname); ?>" disabled>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Last Name</label>
-        <input type="text" class="form-control" value="<?php echo htmlspecialchars($lastname); ?>" disabled>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Email</label>
-        <input type="email" class="form-control" value="<?php echo htmlspecialchars($email); ?>" disabled>
-      </div>
-      <div class="mb-3">
-        <label for="phone" class="form-label">Phone*</label>
-        <input type="text" class="form-control" id="phone" name="phone" required
-          value="<?php echo htmlspecialchars($phone); ?>">
-      </div>
-      <div class="mb-3">
-        <label for="profile_picture" class="form-label">Change Profile Picture</label>
-        <input type="file" class="form-control" id="profile_picture" name="profile_picture" accept="image/*">
-      </div>
-      <button type="submit" class="btn btn-primary">Update Profile</button>
-    </form>
-  </div>
-</div>
 
+    <?php if ($success): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <?= htmlspecialchars($success); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endif; ?>
+
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <?php if ($profilePicture): ?>
+                        <img src="<?= htmlspecialchars($assetBase . $profilePicture); ?>" class="img-fluid rounded-circle mb-3" alt="Profile picture" style="width: 180px; height: 180px; object-fit: cover;">
+                    <?php else: ?>
+                        <div class="d-flex align-items-center justify-content-center bg-light rounded-circle mb-3" style="width: 180px; height: 180px;">
+                            <i class="fas fa-user fa-4x text-muted"></i>
+                        </div>
+                    <?php endif; ?>
+                    <h2 class="h5 mb-0"><?= htmlspecialchars($firstName . ' ' . $lastName); ?></h2>
+                    <p class="text-muted"><?= htmlspecialchars($email); ?></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" class="row g-3" novalidate>
+                        <div class="col-md-6">
+                            <label class="form-label" for="firstname">First name</label>
+                            <input class="form-control" id="firstname" type="text" value="<?= htmlspecialchars($firstName); ?>" disabled>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="lastname">Last name</label>
+                            <input class="form-control" id="lastname" type="text" value="<?= htmlspecialchars($lastName); ?>" disabled>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="email_field">Email</label>
+                            <input class="form-control" id="email_field" type="email" value="<?= htmlspecialchars($email); ?>" disabled>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="phone">Phone number</label>
+                            <input class="form-control" id="phone" name="phone" type="text" value="<?= htmlspecialchars($phone ?? ''); ?>" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="profile_picture">Profile picture</label>
+                            <input class="form-control" id="profile_picture" name="profile_picture" type="file" accept="image/*">
+                            <div class="form-text">Accepted formats: JPG, PNG, GIF. Maximum size depends on server limits.</div>
+                        </div>
+                        <div class="col-12 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-primary">Save changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
 <?php include '../includes/footer.php'; ?>

@@ -1,14 +1,93 @@
 * {
-  margin: 0;
-  padding: 0;
   box-sizing: border-box;
 }
 
-body {
+body.app-body {
   font-family: 'Open Sans', sans-serif;
-  background-color: #1F1F1F;
-  color: #FFF;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  background-color: #f8f9fa;
+  color: #212529;
+  min-height: 100vh;
+  margin: 0;
+}
+
+.app-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+}
+
+.app-container {
+  padding-top: 4.5rem;
+  padding-bottom: 2rem;
+}
+
+body.has-sidebar .app-container {
+  padding-left: 260px;
+  transition: padding-left 0.3s ease;
+}
+
+.app-sidebar {
+  position: fixed;
+  top: 4.5rem;
+  bottom: 0;
+  left: 0;
+  width: 240px;
+  overflow-y: auto;
+  background-color: #f1f3f5;
+  border-right: 1px solid #dee2e6;
+  padding: 1.5rem 1rem;
+  transition: transform 0.3s ease;
+}
+
+.app-sidebar .nav-link {
+  color: #212529;
+  font-weight: 500;
+  border-radius: 0.5rem;
+}
+
+.app-sidebar .nav-link:hover,
+.app-sidebar .nav-link:focus {
+  background-color: #0d6efd;
+  color: #fff;
+}
+
+.app-footer {
+  margin-top: auto;
+}
+
+body.has-sidebar .app-footer {
+  margin-left: 260px;
+  transition: margin-left 0.3s ease;
+}
+
+@media (max-width: 991.98px) {
+  body.has-sidebar .app-container {
+    padding-left: 1rem;
+  }
+
+  body.has-sidebar .app-footer {
+    margin-left: 0;
+  }
+
+  .app-sidebar {
+    transform: translateX(-110%);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  }
+
+  .app-sidebar.is-visible {
+    transform: translateX(0);
+  }
+}
+
+.card {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.05);
+}
+
+.form-container {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.password-toggle {
+  cursor: pointer;
 }
